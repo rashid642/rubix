@@ -1,0 +1,27 @@
+{
+  "name": "rubix",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rashid642/rubix.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rashid642/rubix/issues"
+  },
+  "homepage": "https://github.com/rashid642/rubix#readme",
+  "dependencies": {
+    "express": "^4.17.2",
+    "hbs": "^4.2.0"
+  }
+}
