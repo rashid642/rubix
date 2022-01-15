@@ -5,7 +5,29 @@ const passport = require("passport");
 const flash = require("express-flash");
 const session = require("express-session");
 const methodOverride = require("method-override");
-const connection = require("./utils/dbconnection");
+// const connection = require("./utils/dbconnection");
+// const {loadDrDetails} = require("./utils/getDrDetail")
+const fs = require('fs');
+
+const databasepath = path.join(__dirname, "./database/drdetails.json")
+const loadDrDetails = () => {
+	try {
+		const dataBuffer = fs.readFileSync(databasepath);
+		const dataJSON = dataBuffer.toString();
+		return JSON.parse(dataJSON);
+	} catch (e) {
+		console.log("inside catch "+e);
+		return [];
+	}
+}
+const listDoctor = (id)=> {
+    return new Promise((resolve, reject) => {
+        const doctors = loadDrDetails();
+        const doctor = doctors.find((dr)=> dr.id===id);
+        resolve(doctor);
+    })
+} 
+console.log(listDoctor(1));   
 
 //using passport
 const initializePassport = require("./utils/passportConfig");
@@ -26,6 +48,7 @@ app.set("view engine", "hbs");
 app.set("views", viewsPath);
 hbs.registerPartials(partialsPath);
 app.use(express.static(publicDirectory));
+app.use(express.json());
 
 app.use(flash());
 app.use(session({
@@ -58,7 +81,9 @@ let users = [{
 ];
 
 app.get("/", checkAuthenticated, (req, res) => {
-    res.render("index")
+    res.render("index",{
+        name: req.user.name,
+    })
 })
 // can pass req.user.name
 
@@ -108,6 +133,24 @@ app.get("/userdashboard", [checkAuthenticated, checkIsNotDoctor], (req, res) => 
     })
 })
 
+//pages
+app.get("/bookappointment", [checkAuthenticated, checkIsNotDoctor], (req, res) => {
+    const data = loadDrDetails();
+    res.render("bookappointment", {
+        name: req.user.name,
+        data
+    })
+})
+app.get("/drprofile", [checkAuthenticated, checkIsNotDoctor],async (req, res) => {
+    console.log("id "+req.query.id);
+    const id = parseInt(req.query.id); 
+    const data = await listDoctor(id);
+    console.log(data);
+    res.render("drprofile", {
+        name: req.user.name,
+        data
+    })
+})
 
 //middlewares
 function checkAuthenticated(req, res, next) {
