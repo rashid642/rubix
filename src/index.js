@@ -5,37 +5,50 @@ const passport = require("passport");
 const flash = require("express-flash");
 const session = require("express-session");
 const methodOverride = require("method-override");
-// const connection = require("./utils/dbconnection");
-// const {loadDrDetails} = require("./utils/getDrDetail")
+const upload = require("express-fileupload");
+const connection = require("./utils/dbconnection");
 const fs = require('fs');
 
 const databasepath = path.join(__dirname, "./database/drdetails.json")
 const loadDrDetails = () => {
-	try {
-		const dataBuffer = fs.readFileSync(databasepath);
-		const dataJSON = dataBuffer.toString();
-		return JSON.parse(dataJSON);
-	} catch (e) {
-		console.log("inside catch "+e);
-		return [];
-	}
+    try {
+        const dataBuffer = fs.readFileSync(databasepath);
+        const dataJSON = dataBuffer.toString();
+        return JSON.parse(dataJSON);
+    } catch (e) {
+        console.log("inside catch " + e);
+        return [];
+    }
 }
-const listDoctor = (id)=> {
+const listDoctor = (id) => {
     return new Promise((resolve, reject) => {
         const doctors = loadDrDetails();
-        const doctor = doctors.find((dr)=> dr.id===id);
+        const doctor = doctors.find((dr) => dr.id === id);
         resolve(doctor);
     })
-} 
-console.log(listDoctor(1));   
+}
 
 //using passport
 const initializePassport = require("./utils/passportConfig");
 initializePassport(passport, email => {
-    return users.find(user => user.email === email)
+    return new Promise((resolve, reject) => {
+        const sql = "SELECT * FROM `userdetail` WHERE `email` = '" + email + "'";
+        connection.query(sql, (err, rows) => {
+            console.log(rows[0]);
+            resolve(rows[0]);
+        })
+    })
 }, id => {
-    return users.find(user => user.id === id)
+    return new Promise((resolve, reject) => {
+        const sql = "SELECT * FROM `userdetail` WHERE `id` = " + id + "";
+        connection.query(sql, (err, rows) => {
+            console.log(rows[0]);
+            resolve(rows[0]);
+        })
+    })
 });
+
+
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -49,6 +62,7 @@ app.set("views", viewsPath);
 hbs.registerPartials(partialsPath);
 app.use(express.static(publicDirectory));
 app.use(express.json());
+app.use(upload());
 
 app.use(flash());
 app.use(session({
@@ -63,25 +77,8 @@ app.use(methodOverride("_method"));
 //allow to access data from req
 app.use(express.urlencoded({ extended: false }));
 
-//temporarily using variable to store data
-let users = [{
-    id: '1642234097270',
-    name: 'Rashid Aziz',
-    email: 'md.r.a.n.786@gmail.com',
-    password: '1',
-    status: "user",
-},
-{
-    id: '1642230622595',
-    name: 'Doctor 1',
-    email: 'dr1@d',
-    password: '1',
-    status: "doctor"
-}
-];
-
 app.get("/", checkAuthenticated, (req, res) => {
-    res.render("index",{
+    res.render("index", {
         name: req.user.name,
     })
 })
@@ -93,18 +90,42 @@ app.get("/register", checkNotAuthenticated, (req, res) => {
 })
 app.post("/register", checkNotAuthenticated, async (req, res) => {
     try {
-
         let name = req.body.name;
         let email = req.body.email;
-        let password = req.body.password;
-        users.push({ id, name, email, password })
-        res.redirect("/login");
-    } catch {
+        let password = req.body.password
+        console.log(name+email+password);
+        const sql = "INSERT INTO `userdetail` (`id`, `name`, `email`, `password`, `status`) VALUES (NULL, '" + name + "', '" + email + "', '" + password + "', 'patient');"
+        connection.query(sql, (err, rows) => {
+            if(!err){
+                res.redirect("/login");
+            }else{
+                res.redirect("/register");
+            }
+        })
+    } catch (err){
+        console.log(err);
         res.redirect("/register");
     }
-    console.log(users);
 })
-
+app.get("/drregister", checkNotAuthenticated, (req, res) => {
+    res.render("drregister")
+})
+app.post("/drregister", checkNotAuthenticated, async (req, res) => {
+    const uploadpath = path.join(__dirname, "./uploads")
+    console.log(uploadpath);
+    var file = req.files.file
+    var filename = file.name;
+    try {
+        const sql = "INSERT INTO `drdetail` (`id`, `fullname`, `email`, `speciality`, `qualification`, `experience`, `address`, `certificate`, `password`, `date`) VALUES (NULL, '" + req.body.fullname + "', '" + req.body.email + "', '" + req.body.speciality + "', '" + req.body.qualification + "', '" + req.body.experience + "', '" + req.body.address + "', '" + uploadpath + "/" + filename + "', '" + req.body.password + "', current_timestamp());"
+        connection.query(sql, (erro, rows) => {
+            file.mv(uploadpath + "/" + filename, (error) => {
+                res.redirect("/login");
+            })
+        })
+    } catch (err) {
+        res.redirect("/drregister")
+    }
+})
 //login
 app.get("/login", checkNotAuthenticated, (req, res) => {
     res.render("login");
@@ -141,9 +162,9 @@ app.get("/bookappointment", [checkAuthenticated, checkIsNotDoctor], (req, res) =
         data
     })
 })
-app.get("/drprofile", [checkAuthenticated, checkIsNotDoctor],async (req, res) => {
-    console.log("id "+req.query.id);
-    const id = parseInt(req.query.id); 
+app.get("/drprofile", [checkAuthenticated, checkIsNotDoctor], async (req, res) => {
+    console.log("id " + req.query.id);
+    const id = parseInt(req.query.id);
     const data = await listDoctor(id);
     console.log(data);
     res.render("drprofile", {
@@ -167,17 +188,17 @@ function checkNotAuthenticated(req, res, next) {
     next()
 }
 
-function checkIsDoctor(req, res, next){
-    if(req.user.status === "doctor"){
+function checkIsDoctor(req, res, next) {
+    if (req.user.status === "doctor") {
         return next();
-    }else{
+    } else {
         res.redirect("/userdashboard");
     }
 }
-function checkIsNotDoctor(req, res, next){
-    if(req.user.status !== "doctor"){
+function checkIsNotDoctor(req, res, next) {
+    if (req.user.status !== "doctor") {
         return next();
-    }else{
+    } else {
         res.redirect("/drdashboard");
     }
 }

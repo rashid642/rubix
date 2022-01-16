@@ -1,7 +1,9 @@
 const LocalStrategy = require("passport-local").Strategy;
 function initialize(passport, getUserByEmail, getUserById) {
-    const authenticateUser = (email, password, done) => {
-        const user = getUserByEmail(email);
+    const authenticateUser =  async (email, password, done) => {
+        const user = await getUserByEmail(email);
+        console.log(user)
+        // console.log(user.password);
         if (user == null) {
             return done(null, false, { message: "No user with that email" });
         }
@@ -17,8 +19,9 @@ function initialize(passport, getUserByEmail, getUserById) {
     }
     passport.use(new LocalStrategy({ usernameField: 'email' }, authenticateUser))
     passport.serializeUser((user, done) => done(null, user.id))
-    passport.deserializeUser((id, done) => {
-        return done(null, getUserById(id))
+    passport.deserializeUser(async (id, done) => {
+        const user = await getUserById(id);
+        return done(null, user)
     })
 }
 
