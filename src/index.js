@@ -34,7 +34,7 @@ initializePassport(passport, email => {
     return new Promise((resolve, reject) => {
         const sql = "SELECT * FROM `userdetail` WHERE `email` = '" + email + "'";
         connection.query(sql, (err, rows) => {
-            console.log(rows[0]);
+            // console.log(rows[0]);
             resolve(rows[0]);
         })
     })
@@ -42,7 +42,7 @@ initializePassport(passport, email => {
     return new Promise((resolve, reject) => {
         const sql = "SELECT * FROM `userdetail` WHERE `id` = " + id + "";
         connection.query(sql, (err, rows) => {
-            console.log(rows[0]);
+            // console.log(rows[0]);
             resolve(rows[0]);
         })
     })
@@ -107,6 +107,7 @@ app.post("/register", checkNotAuthenticated, async (req, res) => {
         res.redirect("/register");
     }
 })
+//dr registeration
 app.get("/drregister", checkNotAuthenticated, (req, res) => {
     res.render("drregister")
 })
@@ -142,9 +143,24 @@ app.delete("/logout", (req, res) => {
 
 //dr dashboard
 app.get("/drdashboard", [checkAuthenticated, checkIsDoctor], (req, res) => {
-    res.render("drdashboard", {
-        name: req.user.name
-    })
+    const sql = "SELECT * FROM `connections` WHERE `dremail` LIKE '"+req.user.email+"' AND `status` LIKE 'pending'"
+    let message;
+    let connectionsReq;
+    connection.query(sql, (err, rows) => {
+        console.log(rows.length);
+            if(rows.length == 0){
+                res.render("drdashboard", {
+                    name: req.user.name,
+                    message: "No connection req"
+                })
+            }else{
+                res.render("drdashboard", {
+                    name: req.user.name,
+                    message,
+                    rows
+                })
+            }
+        })
 })
 
 //user dashboard
@@ -166,13 +182,57 @@ app.get("/drprofile", [checkAuthenticated, checkIsNotDoctor], async (req, res) =
     console.log("id " + req.query.id);
     const id = parseInt(req.query.id);
     const data = await listDoctor(id);
-    console.log(data);
+    // console.log(data);
     res.render("drprofile", {
         name: req.user.name,
         data
     })
 })
 
+//connection
+app.post("/connectToDoctor", [checkAuthenticated, checkIsNotDoctor], (req, res) => {
+    console.log(req.user.id);
+    console.log(req.query.email);
+    const sql = "INSERT INTO `connections` (`id`, `dremail`, `patientemail`, `status`) VALUES (NULL, '"+req.query.email+"', '"+req.user.email+"', 'pending');";
+    connection.query(sql, (err, rows) => {
+            if(err){
+                res.redirect("/bookappointment");
+            }else{
+                res.redirect("/userdashboard");
+            }
+        })
+})
+app.post("/accpetConnectReq", [checkAuthenticated, checkIsDoctor], (req, res) => {
+    console.log(req.user.email);
+    console.log(req.query.email);
+    const sql = "UPDATE `connections` SET `status` = 'connected' WHERE `connections`.`dremail` = '"+req.user.email+"';";
+    connection.query(sql, (err, rows) => {
+            if(err){
+                res.redirect("/drdashboard");
+            }else{
+                res.redirect("/drdashboard");
+            }
+        })
+})
+app.get("/connectedPatient", [checkAuthenticated, checkIsDoctor], (req, res) => {
+    const sql = "SELECT * FROM `connections` WHERE `dremail` LIKE '"+req.user.email+"' AND `status` LIKE 'connected'";
+    connection.query(sql, (err, rows) => {
+            if(err){
+                res.redirect("/drdashboard");
+            }else{
+                console.log(rows);
+                res.render("connectedPatient",{
+                    rows,
+                })
+            }
+        })
+})
+app.get("/room",checkAuthenticated,(req, res)=>{
+    res.render("room",{
+        patient: req.query.pateintemail,
+        doctor: req.query.dremail
+    })
+})
 //middlewares
 function checkAuthenticated(req, res, next) {
     if (req.isAuthenticated()) {
